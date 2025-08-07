@@ -743,6 +743,7 @@ class EventType(str, Enum):
     WINDOW_BLUR = "window_blur"
     COPY_PASTE = "copy_paste"
     SUSPICIOUS_ACTIVITY = "suspicious_activity"
+    MOUSE_DRIFT = "mouse_drift"
 
 
 class SeverityLevel(str, Enum):
@@ -868,3 +869,53 @@ class CohortIntegrityOverviewResponse(BaseModel):
     total_flags: int
     sessions_with_issues: int
     session_analyses: Optional[List[SessionAnalysisResponse]] = None
+
+
+# Analysis Request/Response Models
+
+class FaceEulerAngles(BaseModel):
+    yaw: float | None = None  # left/right in degrees; +right, -left convention
+    pitch: float | None = None  # up/down in degrees; +down, -up convention
+    roll: float | None = None
+
+
+class FaceLandmark(BaseModel):
+    x: float
+    y: float
+    z: float | None = None
+
+
+class GazeAnalysisRequest(BaseModel):
+    session_uuid: str
+    user_id: int
+    timestamp: Optional[datetime] = None
+    face_landmarks: Optional[List[FaceLandmark]] = None  # normalized [0,1]
+    euler_angles: Optional[FaceEulerAngles] = None
+    config: Optional[Dict] = None  # thresholds override
+
+
+class GazeAnalysisResponse(BaseModel):
+    looking_away: bool
+    confidence: float
+    metrics: Dict
+
+
+class MouseSample(BaseModel):
+    t: float  # milliseconds since epoch or session start
+    x: float  # pixels
+    y: float  # pixels
+
+
+class MouseDriftAnalysisRequest(BaseModel):
+    session_uuid: str
+    user_id: int
+    samples: List[MouseSample]
+    screen_width: Optional[int] = None
+    screen_height: Optional[int] = None
+    config: Optional[Dict] = None  # thresholds override
+
+
+class MouseDriftAnalysisResponse(BaseModel):
+    is_drift: bool
+    drift_score: float
+    metrics: Dict
