@@ -175,7 +175,7 @@ async def insert_or_return_user(
 
 async def update_user(
     cursor,
-    user_id: str,
+    user_id: int,
     first_name: str,
     middle_name: str,
     last_name: str,
@@ -207,7 +207,7 @@ async def get_user_by_email(email: str) -> Dict:
     return convert_user_db_to_dict(user)
 
 
-async def get_user_by_id(user_id: str) -> Dict:
+async def get_user_by_id(user_id: int) -> Dict:
     user = await execute_db_operation(
         f"SELECT * FROM {users_table_name} WHERE id = ?", (user_id,), fetch_one=True
     )

@@ -530,6 +530,14 @@ class UpdateDraftQuizRequest(BaseModel):
     questions: List[CreateQuestionRequest]
     scheduled_publish_at: datetime | None
     status: TaskStatus
+    # Assessment mode fields
+    assessment_mode: bool = False
+    duration_minutes: int = 60
+    integrity_monitoring: bool = False
+    attempts_allowed: int = 1
+    shuffle_questions: bool = False
+    show_results: bool = True
+    passing_score_percentage: int = 60
 
 
 class UpdateQuestionRequest(BaseModel):
@@ -549,6 +557,14 @@ class UpdatePublishedQuizRequest(BaseModel):
     title: str
     questions: List[UpdateQuestionRequest]
     scheduled_publish_at: datetime | None
+    # Assessment mode fields
+    assessment_mode: bool = False
+    duration_minutes: int = 60
+    integrity_monitoring: bool = False
+    attempts_allowed: int = 1
+    shuffle_questions: bool = False
+    show_results: bool = True
+    passing_score_percentage: int = 60
 
 
 class DuplicateTaskRequest(BaseModel):

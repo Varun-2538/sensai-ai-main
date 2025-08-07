@@ -92,6 +92,13 @@ async def update_draft_quiz(task_id: int, request: UpdateDraftQuizRequest) -> Qu
         questions=request.questions,
         scheduled_publish_at=request.scheduled_publish_at,
         status=request.status,
+        assessment_mode=request.assessment_mode,
+        duration_minutes=request.duration_minutes,
+        integrity_monitoring=request.integrity_monitoring,
+        attempts_allowed=request.attempts_allowed,
+        shuffle_questions=request.shuffle_questions,
+        show_results=request.show_results,
+        passing_score_percentage=request.passing_score_percentage,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -107,6 +114,13 @@ async def update_published_quiz(
         title=request.title,
         questions=request.questions,
         scheduled_publish_at=request.scheduled_publish_at,
+        assessment_mode=request.assessment_mode,
+        duration_minutes=request.duration_minutes,
+        integrity_monitoring=request.integrity_monitoring,
+        attempts_allowed=request.attempts_allowed,
+        shuffle_questions=request.shuffle_questions,
+        show_results=request.show_results,
+        passing_score_percentage=request.passing_score_percentage,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Task not found")

@@ -341,6 +341,13 @@ async def update_draft_quiz(
     questions: List[Dict],
     scheduled_publish_at: datetime,
     status: TaskStatus = TaskStatus.PUBLISHED,
+    assessment_mode: bool = False,
+    duration_minutes: int = 60,
+    integrity_monitoring: bool = False,
+    attempts_allowed: int = 1,
+    shuffle_questions: bool = False,
+    show_results: bool = True,
+    passing_score_percentage: int = 60,
 ):
     if not await does_task_exist(task_id):
         return False
@@ -432,10 +439,18 @@ async def update_draft_quiz(
                 (str(ScorecardStatus.PUBLISHED),),
             )
 
-        # Update task status to published
+        # Update task status and assessment mode fields
         await cursor.execute(
-            f"UPDATE {tasks_table_name} SET status = ?, title = ?, scheduled_publish_at = ? WHERE id = ?",
-            (str(status), title, scheduled_publish_at, task_id),
+            f"""UPDATE {tasks_table_name} SET 
+                status = ?, title = ?, scheduled_publish_at = ?,
+                assessment_mode = ?, duration_minutes = ?, integrity_monitoring = ?,
+                attempts_allowed = ?, shuffle_questions = ?, show_results = ?,
+                passing_score_percentage = ?
+                WHERE id = ?""",
+            (str(status), title, scheduled_publish_at, 
+             assessment_mode, duration_minutes, integrity_monitoring,
+             attempts_allowed, shuffle_questions, show_results,
+             passing_score_percentage, task_id),
         )
 
         await conn.commit()
@@ -444,7 +459,14 @@ async def update_draft_quiz(
 
 
 async def update_published_quiz(
-    task_id: int, title: str, questions: List[Dict], scheduled_publish_at: datetime
+    task_id: int, title: str, questions: List[Dict], scheduled_publish_at: datetime,
+    assessment_mode: bool = False,
+    duration_minutes: int = 60,
+    integrity_monitoring: bool = False,
+    attempts_allowed: int = 1,
+    shuffle_questions: bool = False,
+    show_results: bool = True,
+    passing_score_percentage: int = 60,
 ):
     if not await does_task_exist(task_id):
         return False
@@ -520,10 +542,18 @@ async def update_published_quiz(
                 (str(ScorecardStatus.PUBLISHED),),
             )
 
-        # Update task status to published
+        # Update task status and assessment mode fields
         await cursor.execute(
-            f"UPDATE {tasks_table_name} SET title = ?, scheduled_publish_at = ? WHERE id = ?",
-            (title, scheduled_publish_at, task_id),
+            f"""UPDATE {tasks_table_name} SET 
+                title = ?, scheduled_publish_at = ?,
+                assessment_mode = ?, duration_minutes = ?, integrity_monitoring = ?,
+                attempts_allowed = ?, shuffle_questions = ?, show_results = ?,
+                passing_score_percentage = ?
+                WHERE id = ?""",
+            (title, scheduled_publish_at,
+             assessment_mode, duration_minutes, integrity_monitoring,
+             attempts_allowed, shuffle_questions, show_results,
+             passing_score_percentage, task_id),
         )
 
         await conn.commit()
