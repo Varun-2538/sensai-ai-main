@@ -327,6 +327,14 @@ class PublishedQuestion(DraftQuestion):
 
 class QuizTask(Task):
     questions: List[PublishedQuestion]
+    # Assessment mode fields
+    assessment_mode: bool = False
+    duration_minutes: int = 60
+    integrity_monitoring: bool = False
+    attempts_allowed: int = 1
+    shuffle_questions: bool = False
+    show_results: bool = True
+    passing_score_percentage: int = 60
 
 
 class GenerateCourseJobStatus(str, Enum):
