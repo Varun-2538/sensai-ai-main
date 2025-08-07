@@ -192,7 +192,10 @@ async def get_question(question_id: int) -> Dict:
 async def get_basic_task_details(task_id: int) -> Dict:
     task = await execute_db_operation(
         f"""
-        SELECT id, title, type, status, org_id, scheduled_publish_at
+        SELECT id, title, type, status, org_id, scheduled_publish_at,
+               assessment_mode, duration_minutes, integrity_monitoring,
+               attempts_allowed, shuffle_questions, show_results,
+               passing_score_percentage
         FROM {tasks_table_name}
         WHERE id = ? AND deleted_at IS NULL
         """,
@@ -210,6 +213,13 @@ async def get_basic_task_details(task_id: int) -> Dict:
         "status": task[3],
         "org_id": task[4],
         "scheduled_publish_at": task[5],
+        "assessment_mode": task[6],
+        "duration_minutes": task[7],
+        "integrity_monitoring": task[8],
+        "attempts_allowed": task[9],
+        "shuffle_questions": task[10],
+        "show_results": task[11],
+        "passing_score_percentage": task[12],
     }
 
 

@@ -86,12 +86,28 @@ async def update_learning_material_task(
 
 @router.post("/{task_id}/quiz", response_model=QuizTask)
 async def update_draft_quiz(task_id: int, request: UpdateDraftQuizRequest) -> QuizTask:
+    # Only forward assessment-related fields if they were explicitly provided
+    optional_kwargs = {}
+    provided_fields = getattr(request, "model_fields_set", set())
+    for field_name in [
+        "assessment_mode",
+        "duration_minutes",
+        "integrity_monitoring",
+        "attempts_allowed",
+        "shuffle_questions",
+        "show_results",
+        "passing_score_percentage",
+    ]:
+        if field_name in provided_fields:
+            optional_kwargs[field_name] = getattr(request, field_name)
+
     result = await update_draft_quiz_in_db(
         task_id=task_id,
         title=request.title,
         questions=request.questions,
         scheduled_publish_at=request.scheduled_publish_at,
         status=request.status,
+        **optional_kwargs,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -102,11 +118,27 @@ async def update_draft_quiz(task_id: int, request: UpdateDraftQuizRequest) -> Qu
 async def update_published_quiz(
     task_id: int, request: UpdatePublishedQuizRequest
 ) -> QuizTask:
+    # Only forward assessment-related fields if they were explicitly provided
+    optional_kwargs = {}
+    provided_fields = getattr(request, "model_fields_set", set())
+    for field_name in [
+        "assessment_mode",
+        "duration_minutes",
+        "integrity_monitoring",
+        "attempts_allowed",
+        "shuffle_questions",
+        "show_results",
+        "passing_score_percentage",
+    ]:
+        if field_name in provided_fields:
+            optional_kwargs[field_name] = getattr(request, field_name)
+
     result = await update_published_quiz_in_db(
         task_id=task_id,
         title=request.title,
         questions=request.questions,
         scheduled_publish_at=request.scheduled_publish_at,
+        **optional_kwargs,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Task not found")

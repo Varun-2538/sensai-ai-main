@@ -43,13 +43,20 @@ async def start_assessment_session(request: StartAssessmentRequest):
     
     # Check if user already has an active session for this task
     existing_session = await execute_db_operation(
-        "SELECT id FROM assessment_sessions WHERE task_id = ? AND status = 'active'",
+        "SELECT id, duration_minutes, integrity_session_id FROM assessment_sessions WHERE task_id = ? AND status = 'active'",
         (request.task_id,),
         fetch_one=True
     )
     
     if existing_session:
-        raise HTTPException(status_code=400, detail="Active assessment session already exists for this task")
+        # Idempotent behavior: return the existing active session instead of erroring
+        return {
+            "session_id": existing_session[0],
+            "duration_minutes": existing_session[1] or duration_minutes,
+            "integrity_session_id": existing_session[2],
+            "questions": task.get('questions', []),
+            "task": task
+        }
     
     # Create integrity session if monitoring enabled
     integrity_session_id = None
