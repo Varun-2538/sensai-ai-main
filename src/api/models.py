@@ -705,3 +705,142 @@ class SaveCodeDraftRequest(BaseModel):
 class CodeDraft(BaseModel):
     id: int
     code: List[LanguageCodeDraft]
+
+
+# Integrity Monitoring Models
+
+class EventType(str, Enum):
+    FACE_NOT_DETECTED = "face_not_detected"
+    MULTIPLE_FACES = "multiple_faces"
+    LOOKING_AWAY = "looking_away"
+    HEAD_MOVEMENT = "head_movement"
+    POSE_CHANGE = "pose_change"
+    TAB_SWITCH = "tab_switch"
+    WINDOW_BLUR = "window_blur"
+    COPY_PASTE = "copy_paste"
+    SUSPICIOUS_ACTIVITY = "suspicious_activity"
+
+
+class SeverityLevel(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class SessionStatus(str, Enum):
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    TERMINATED = "terminated"
+    SUSPENDED = "suspended"
+
+
+class FlagType(str, Enum):
+    IDENTITY_VERIFICATION = "identity_verification"
+    MULTIPLE_PERSONS = "multiple_persons"
+    UNAUTHORIZED_ASSISTANCE = "unauthorized_assistance"
+    TECHNICAL_VIOLATION = "technical_violation"
+    SUSPICIOUS_BEHAVIOR = "suspicious_behavior"
+
+
+class ReviewerDecision(str, Enum):
+    VALID = "valid"
+    INVALID = "invalid"
+    NEEDS_REVIEW = "needs_review"
+    RESOLVED = "resolved"
+
+
+# Request Models
+
+class CreateIntegritySessionRequest(BaseModel):
+    user_id: int
+    cohort_id: Optional[int] = None
+    task_id: Optional[int] = None
+    monitoring_config: Optional[Dict] = None
+
+
+class CreateProctorEventRequest(BaseModel):
+    session_uuid: str
+    user_id: int
+    event_type: EventType
+    data: Optional[Dict] = None
+    severity: SeverityLevel = SeverityLevel.MEDIUM
+    flagged: bool = False
+
+
+class BatchProctorEventsRequest(BaseModel):
+    events: List[CreateProctorEventRequest]
+
+
+class CreateIntegrityFlagRequest(BaseModel):
+    session_uuid: str
+    user_id: int
+    flag_type: FlagType
+    confidence_score: float = 0.0
+    evidence: Optional[Dict] = None
+
+
+class UpdateFlagDecisionRequest(BaseModel):
+    reviewer_decision: ReviewerDecision
+
+
+class UpdateSessionStatusRequest(BaseModel):
+    status: SessionStatus
+    session_end: Optional[datetime] = None
+
+
+# Response Models
+
+class IntegritySessionResponse(BaseModel):
+    id: int
+    session_uuid: str
+    user_id: int
+    cohort_id: Optional[int]
+    task_id: Optional[int]
+    monitoring_config: Optional[Dict]
+    session_start: datetime
+    session_end: Optional[datetime]
+    status: SessionStatus
+
+
+class ProctorEventResponse(BaseModel):
+    id: int
+    session_uuid: str
+    user_id: int
+    event_type: EventType
+    timestamp: datetime
+    data: Optional[Dict]
+    severity: SeverityLevel
+    flagged: bool
+
+
+class IntegrityFlagResponse(BaseModel):
+    id: int
+    session_uuid: str
+    user_id: int
+    flag_type: FlagType
+    confidence_score: float
+    evidence: Optional[Dict]
+    reviewer_decision: Optional[ReviewerDecision]
+    created_at: datetime
+    reviewed_at: Optional[datetime]
+
+
+class SessionAnalysisResponse(BaseModel):
+    session: IntegritySessionResponse
+    integrity_score: float
+    total_events: int
+    flagged_events: int
+    flags_count: int
+    event_types: Dict[str, int]
+    severity_distribution: Dict[str, int]
+    recent_events: List[ProctorEventResponse]
+    flags: List[IntegrityFlagResponse]
+
+
+class CohortIntegrityOverviewResponse(BaseModel):
+    cohort_id: int
+    total_sessions: int
+    average_integrity_score: float
+    total_flags: int
+    sessions_with_issues: int
+    session_analyses: Optional[List[SessionAnalysisResponse]] = None

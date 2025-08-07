@@ -54,6 +54,9 @@ course_generation_jobs_table_name = "course_generation_jobs"
 task_generation_jobs_table_name = "task_generation_jobs"
 org_api_keys_table_name = "org_api_keys"
 code_drafts_table_name = "code_drafts"
+integrity_sessions_table_name = "integrity_sessions"
+proctor_events_table_name = "proctor_events"
+integrity_flags_table_name = "integrity_flags"
 
 UPLOAD_FOLDER_NAME = "uploads"
 
