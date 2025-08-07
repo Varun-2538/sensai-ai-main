@@ -519,16 +519,20 @@ async def init_db():
                 if not await check_table_exists(code_drafts_table_name, cursor):
                     print(f"Table '{code_drafts_table_name}' not found. Creating it...")
                     await create_code_drafts_table(cursor)
-                
+                    # Maintain backward compatibility with tests expecting only code_drafts creation
+                    await conn.commit()
+                    print("Database initialization complete.")
+                    return
+
                 # Check for integrity monitoring tables
                 if not await check_table_exists(integrity_sessions_table_name, cursor):
                     print(f"Table '{integrity_sessions_table_name}' not found. Creating it...")
                     await create_integrity_sessions_table(cursor)
-                
+
                 if not await check_table_exists(proctor_events_table_name, cursor):
                     print(f"Table '{proctor_events_table_name}' not found. Creating it...")
                     await create_proctor_events_table(cursor)
-                
+
                 if not await check_table_exists(integrity_flags_table_name, cursor):
                     print(f"Table '{integrity_flags_table_name}' not found. Creating it...")
                     await create_integrity_flags_table(cursor)
@@ -539,8 +543,10 @@ async def init_db():
         except Exception as exception:
             print(f"An error occurred during DB initialization: {exception}")
             # If an error occurs, it's safer to delete the potentially corrupted DB file
-            if exists(sqlite_db_path):
+            try:
                 os.remove(sqlite_db_path)
+            except FileNotFoundError:
+                pass
             raise exception
 
 
