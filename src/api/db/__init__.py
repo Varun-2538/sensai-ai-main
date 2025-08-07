@@ -27,6 +27,14 @@ from api.config import (
     task_generation_jobs_table_name,
     org_api_keys_table_name,
     code_drafts_table_name,
+    integrity_sessions_table_name,
+    proctor_events_table_name,
+    integrity_flags_table_name,
+)
+from api.db.integrity import (
+    create_integrity_sessions_table,
+    create_proctor_events_table,
+    create_integrity_flags_table,
 )
 
 
@@ -468,64 +476,71 @@ async def init_db():
     if not os.path.exists(db_folder):
         os.makedirs(db_folder)
 
-    if not exists(sqlite_db_path):
+    # Check if the database file exists BEFORE we connect
+    is_new_db = not exists(sqlite_db_path)
+
+    if is_new_db:
+        print("Database file not found. Will create a new one.")
         # only set the defaults the first time
         set_db_defaults()
 
     async with get_new_db_connection() as conn:
         cursor = await conn.cursor()
 
-        if exists(sqlite_db_path):
-            if not await check_table_exists(code_drafts_table_name, cursor):
-                await create_code_drafts_table(cursor)
-
-            await conn.commit()
-            return
-
         try:
-            await create_organizations_table(cursor)
-
-            await create_org_api_keys_table(cursor)
-
-            await create_users_table(cursor)
-
-            await create_user_organizations_table(cursor)
-
-            await create_milestones_table(cursor)
-
-            await create_cohort_tables(cursor)
-
-            await create_courses_table(cursor)
-
-            await create_course_cohorts_table(cursor)
-
-            await create_tasks_table(cursor)
-
-            await create_questions_table(cursor)
-
-            await create_scorecards_table(cursor)
-
-            await create_question_scorecards_table(cursor)
-
-            await create_chat_history_table(cursor)
-
-            await create_task_completion_table(cursor)
-
-            await create_course_tasks_table(cursor)
-
-            await create_course_milestones_table(cursor)
-
-            await create_course_generation_jobs_table(cursor)
-
-            await create_task_generation_jobs_table(cursor)
-
-            await create_code_drafts_table(cursor)
+            # If it's a new DB, we must create all tables.
+            if is_new_db:
+                print("Creating all database tables...")
+                await create_organizations_table(cursor)
+                await create_org_api_keys_table(cursor)
+                await create_users_table(cursor)
+                await create_user_organizations_table(cursor)
+                await create_milestones_table(cursor)
+                await create_cohort_tables(cursor)
+                await create_courses_table(cursor)
+                await create_course_cohorts_table(cursor)
+                await create_tasks_table(cursor)
+                await create_questions_table(cursor)
+                await create_scorecards_table(cursor)
+                await create_question_scorecards_table(cursor)
+                await create_chat_history_table(cursor)
+                await create_task_completion_table(cursor)
+                await create_course_tasks_table(cursor)
+                await create_course_milestones_table(cursor)
+                await create_course_generation_jobs_table(cursor)
+                await create_task_generation_jobs_table(cursor)
+                await create_code_drafts_table(cursor)
+                await create_integrity_sessions_table(cursor)
+                await create_proctor_events_table(cursor)
+                await create_integrity_flags_table(cursor)
+            else:
+                # This is for migrations: if the DB exists, check for missing tables.
+                print("Database exists. Checking for missing tables...")
+                if not await check_table_exists(code_drafts_table_name, cursor):
+                    print(f"Table '{code_drafts_table_name}' not found. Creating it...")
+                    await create_code_drafts_table(cursor)
+                
+                # Check for integrity monitoring tables
+                if not await check_table_exists(integrity_sessions_table_name, cursor):
+                    print(f"Table '{integrity_sessions_table_name}' not found. Creating it...")
+                    await create_integrity_sessions_table(cursor)
+                
+                if not await check_table_exists(proctor_events_table_name, cursor):
+                    print(f"Table '{proctor_events_table_name}' not found. Creating it...")
+                    await create_proctor_events_table(cursor)
+                
+                if not await check_table_exists(integrity_flags_table_name, cursor):
+                    print(f"Table '{integrity_flags_table_name}' not found. Creating it...")
+                    await create_integrity_flags_table(cursor)
 
             await conn.commit()
+            print("Database initialization complete.")
 
         except Exception as exception:
-            # delete db
-            os.remove(sqlite_db_path)
+            print(f"An error occurred during DB initialization: {exception}")
+            # If an error occurs, it's safer to delete the potentially corrupted DB file
+            if exists(sqlite_db_path):
+                os.remove(sqlite_db_path)
             raise exception
 
 
