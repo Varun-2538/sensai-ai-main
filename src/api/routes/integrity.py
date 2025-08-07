@@ -22,6 +22,10 @@ from api.models import (
     FlagType,
     SessionStatus,
     ReviewerDecision,
+    GazeAnalysisRequest,
+    GazeAnalysisResponse,
+    MouseDriftAnalysisRequest,
+    MouseDriftAnalysisResponse,
 )
 
 from api.db.integrity import (
@@ -522,3 +526,81 @@ async def integrity_health_check():
         "service": "integrity-monitoring",
         "timestamp": datetime.utcnow().isoformat()
     }
+
+
+# Analysis Endpoints (stateless heuristics + optional event creation)
+
+from api.utils.integrity_analysis import analyze_gaze_data, analyze_mouse_drift
+
+
+@router.post("/analyze/gaze", response_model=GazeAnalysisResponse)
+async def analyze_gaze(request: GazeAnalysisRequest):
+    """Analyze gaze from landmarks/head pose server-side and optionally create an event."""
+    # Validate session exists
+    session_data = await get_integrity_session(request.session_uuid)
+    if not session_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+
+    looking_away, confidence, metrics = analyze_gaze_data(
+        face_landmarks=[lm.dict() for lm in request.face_landmarks] if request.face_landmarks else None,
+        euler_angles=request.euler_angles.dict() if request.euler_angles else None,
+        config=request.config or {},
+    )
+
+    # Optionally record event based on threshold
+    threshold = float((request.config or {}).get("event_threshold", 0.7))
+    if looking_away and confidence >= threshold:
+        await create_proctor_event(
+            session_uuid=request.session_uuid,
+            user_id=request.user_id,
+            event_type=EventType.LOOKING_AWAY.value,
+            data={"metrics": metrics, "confidence": confidence},
+            severity=SeverityLevel.MEDIUM.value,
+            flagged=True,
+        )
+
+    return GazeAnalysisResponse(
+        looking_away=bool(looking_away),
+        confidence=float(confidence),
+        metrics=metrics,
+    )
+
+
+@router.post("/analyze/mouse-drift", response_model=MouseDriftAnalysisResponse)
+async def analyze_mouse_drift_endpoint(request: MouseDriftAnalysisRequest):
+    """Analyze mouse samples for drifting server-side and optionally create an event."""
+    # Validate session exists
+    session_data = await get_integrity_session(request.session_uuid)
+    if not session_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+
+    is_drift, drift_score, metrics = analyze_mouse_drift(
+        samples=[s.dict() for s in request.samples],
+        screen_width=request.screen_width,
+        screen_height=request.screen_height,
+        config=request.config or {},
+    )
+
+    # Optionally record event based on threshold
+    threshold = float((request.config or {}).get("event_threshold", 0.7))
+    if is_drift and drift_score >= threshold:
+        await create_proctor_event(
+            session_uuid=request.session_uuid,
+            user_id=request.user_id,
+            event_type=EventType.MOUSE_DRIFT.value,
+            data={"metrics": metrics, "drift_score": drift_score},
+            severity=SeverityLevel.MEDIUM.value,
+            flagged=True,
+        )
+
+    return MouseDriftAnalysisResponse(
+        is_drift=bool(is_drift),
+        drift_score=float(drift_score),
+        metrics=metrics,
+    )
