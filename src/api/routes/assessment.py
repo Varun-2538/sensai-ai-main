@@ -17,6 +17,7 @@ class StartAssessmentRequest(BaseModel):
     task_id: int
     cohort_id: Optional[int] = None
     integrity_monitoring: bool = False
+    user_id: Optional[int] = None
 
 class QuestionResponseRequest(BaseModel):
     session_id: str
@@ -65,7 +66,7 @@ async def start_assessment_session(request: StartAssessmentRequest):
             # Create integrity session using DB layer to ensure a session_uuid is returned
             from ..db.integrity import create_integrity_session as create_integrity_session_db
             integrity_session_uuid = await create_integrity_session_db(
-                user_id=1,  # TODO: Replace with authenticated user id
+                user_id=request.user_id or 1,  # TODO: Replace with authenticated user id
                 cohort_id=request.cohort_id,
                 task_id=request.task_id,
                 monitoring_config={"source": "assessment"}
@@ -80,7 +81,7 @@ async def start_assessment_session(request: StartAssessmentRequest):
            (id, task_id, user_id, cohort_id, integrity_session_id, duration_minutes, 
             time_remaining_seconds, status, created_at) 
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (session_id, request.task_id, 1, request.cohort_id,  # TODO: Get user_id from auth
+        (session_id, request.task_id, request.user_id or 1, request.cohort_id,
          integrity_session_id, duration_minutes, duration_minutes * 60, 'active', 
          datetime.now().isoformat())
     )
@@ -224,10 +225,23 @@ async def submit_assessment(session_id: str):
          total_score, max_score, time_spent_minutes, datetime.now().isoformat())
     )
     
-    # Calculate pass/fail based on task's passing score
+    # Mark task completion (best-effort) and calculate pass/fail based on task's passing score
     task = await get_task(session[1])  # task_id column
     passing_percentage = task.get('passing_score_percentage', 60)
     passed = (total_score / max_score * 100) >= passing_percentage if max_score > 0 else False
+
+    # Insert completion record for the task
+    try:
+        from ..config import task_completions_table_name
+        await execute_db_operation(
+            f"""
+            INSERT OR IGNORE INTO {task_completions_table_name} (user_id, task_id)
+            VALUES (?, ?)
+            """,
+            (session[2], session[1])  # user_id, task_id
+        )
+    except Exception as e:
+        print(f"Failed to record task completion for assessment session {session_id}: {e}")
     
     return {
         "status": "submitted",
