@@ -519,10 +519,7 @@ async def init_db():
                 if not await check_table_exists(code_drafts_table_name, cursor):
                     print(f"Table '{code_drafts_table_name}' not found. Creating it...")
                     await create_code_drafts_table(cursor)
-                    # Maintain backward compatibility with tests expecting only code_drafts creation
-                    await conn.commit()
-                    print("Database initialization complete.")
-                    return
+                    # Do NOT return early here; continue to check and create any newer tables
 
                 # Check for integrity monitoring tables
                 if not await check_table_exists(integrity_sessions_table_name, cursor):

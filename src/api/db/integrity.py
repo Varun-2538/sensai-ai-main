@@ -228,11 +228,26 @@ async def create_proctor_event(
             (session_uuid, user_id, event_type, data_json, severity, flagged)
         )
         await conn.commit()
-        return cursor.lastrowid
+        event_id = cursor.lastrowid
+
+    # Best-effort: create a corresponding flag record when event is flagged
+    if flagged:
+        try:
+            await create_integrity_flag(
+                session_uuid=session_uuid,
+                user_id=user_id,
+                flag_type=_map_event_to_flag_type(event_type),
+                confidence_score=_severity_to_confidence(severity),
+                evidence={"event_type": event_type, "data": data or {}}
+            )
+        except Exception:
+            pass
+
+    return event_id
 
 
 async def create_batch_proctor_events(events: List[Dict[str, Any]]) -> List[int]:
-    """Create multiple proctor events in a batch"""
+    """Create multiple proctor events in a batch; also create flags for flagged events."""
     event_ids = []
     
     async with get_new_db_connection() as conn:
@@ -257,7 +272,45 @@ async def create_batch_proctor_events(events: List[Dict[str, Any]]) -> List[int]
         
         await conn.commit()
     
+    # After commit, best-effort flag creation for those marked flagged
+    for event in events:
+        if event.get('flagged'):
+            try:
+                await create_integrity_flag(
+                    session_uuid=event['session_uuid'],
+                    user_id=event['user_id'],
+                    flag_type=_map_event_to_flag_type(event['event_type']),
+                    confidence_score=_severity_to_confidence(event.get('severity', 'medium')),
+                    evidence={"event_type": event['event_type'], "data": event.get('data') or {}}
+                )
+            except Exception:
+                pass
+
     return event_ids
+
+# Helpers
+def _map_event_to_flag_type(event_type: str) -> str:
+    mapping = {
+        'multiple_faces': 'multiple_persons',
+        'face_not_detected': 'identity_verification',
+        'copy_paste': 'unauthorized_assistance',
+        'tab_switch': 'technical_violation',
+        'window_blur': 'technical_violation',
+        'looking_away': 'suspicious_behavior',
+        'head_movement': 'suspicious_behavior',
+        'pose_change': 'suspicious_behavior',
+        'suspicious_activity': 'suspicious_behavior',
+        'mouse_drift': 'suspicious_behavior',
+    }
+    return mapping.get(event_type, 'suspicious_behavior')
+
+
+def _severity_to_confidence(severity: str) -> float:
+    return {
+        'high': 0.9,
+        'medium': 0.6,
+        'low': 0.3,
+    }.get(severity, 0.5)
 
 
 async def get_session_events(

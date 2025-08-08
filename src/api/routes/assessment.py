@@ -62,14 +62,15 @@ async def start_assessment_session(request: StartAssessmentRequest):
     integrity_session_id = None
     if request.integrity_monitoring and task.get('integrity_monitoring', False):
         try:
-            # Import here to avoid circular imports
-            from ..routes.integrity import create_integrity_session
-            integrity_session = await create_integrity_session({
-                'user_id': 1,  # TODO: Get from current user
-                'cohort_id': request.cohort_id,
-                'task_id': request.task_id
-            })
-            integrity_session_id = integrity_session.get('session_uuid')
+            # Create integrity session using DB layer to ensure a session_uuid is returned
+            from ..db.integrity import create_integrity_session as create_integrity_session_db
+            integrity_session_uuid = await create_integrity_session_db(
+                user_id=1,  # TODO: Replace with authenticated user id
+                cohort_id=request.cohort_id,
+                task_id=request.task_id,
+                monitoring_config={"source": "assessment"}
+            )
+            integrity_session_id = integrity_session_uuid
         except Exception as e:
             print(f"Failed to create integrity session: {e}")
     
