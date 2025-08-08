@@ -744,6 +744,7 @@ class EventType(str, Enum):
     COPY_PASTE = "copy_paste"
     SUSPICIOUS_ACTIVITY = "suspicious_activity"
     MOUSE_DRIFT = "mouse_drift"
+    SNAPSHOT = "snapshot"
 
 
 class SeverityLevel(str, Enum):

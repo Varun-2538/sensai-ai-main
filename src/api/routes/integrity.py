@@ -2,6 +2,8 @@
 API routes for integrity monitoring and proctoring
 """
 from fastapi import APIRouter, HTTPException, status
+from fastapi import Body
+import httpx
 from typing import List, Optional
 from datetime import datetime
 
@@ -26,6 +28,8 @@ from api.models import (
     GazeAnalysisResponse,
     MouseDriftAnalysisRequest,
     MouseDriftAnalysisResponse,
+    EventType,
+    SeverityLevel,
 )
 
 from api.db.integrity import (
@@ -44,6 +48,7 @@ from api.db.integrity import (
     get_session_analysis,
     get_cohort_integrity_overview,
 )
+from api.settings import settings
 
 router = APIRouter()
 
@@ -526,6 +531,74 @@ async def integrity_health_check():
         "service": "integrity-monitoring",
         "timestamp": datetime.utcnow().isoformat()
     }
+# Snapshot upload to IPFS (Pinata)
+
+@router.post("/snapshots")
+async def upload_snapshot_and_record_event(
+    session_uuid: str = Body(...),
+    user_id: int = Body(...),
+    image_base64: str = Body(..., description="Data URL or raw base64 without prefix"),
+    filename: str | None = Body(None),
+):
+    """Accepts a base64-encoded PNG/JPEG image, uploads to Pinata, and stores an event with the CID.
+    Returns: { cid, url }
+    """
+    # Validate session exists
+    session_data = await get_integrity_session(session_uuid)
+    if not session_data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    if not settings.pinata_jwt:
+        raise HTTPException(status_code=500, detail="Pinata credentials not configured")
+
+    # Strip data URL prefix if present
+    try:
+        if image_base64.startswith("data:"):
+            comma_index = image_base64.find(",")
+            image_base64 = image_base64[comma_index + 1 :]
+        # Pinata pinFile API expects multipart/form-data with file bytes. Use pinJSON as fallback.
+        # We'll use pinFile via the "file" form field using httpx.AsyncClient.
+        import base64
+        import io
+        binary = base64.b64decode(image_base64)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid base64 image: {e}")
+
+    # Prepare multipart form for pinata
+    files = {
+        "file": (filename or "snapshot.png", binary, "application/octet-stream"),
+    }
+    pinata_url = "https://api.pinata.cloud/pinning/pinFileToIPFS"
+    headers = {
+        "Authorization": f"Bearer {settings.pinata_jwt}",
+    }
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            resp = await client.post(pinata_url, files=files, headers=headers)
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=502, detail=f"Pinata upload failed: {e}")
+
+    data = resp.json()
+    cid = data.get("IpfsHash") or data.get("cid")
+    if not cid:
+        raise HTTPException(status_code=502, detail="Pinata response missing CID")
+
+    gateway_base = settings.pinata_gateway_base or "https://gateway.pinata.cloud/ipfs/"
+    url = f"{gateway_base}{cid}"
+
+    # Record proctor event with CID
+    await create_proctor_event(
+        session_uuid=session_uuid,
+        user_id=user_id,
+        event_type=EventType.SNAPSHOT.value,
+        data={"ipfs_cid": cid, "url": url, "filename": filename},
+        severity=SeverityLevel.LOW.value,
+        flagged=False,
+    )
+
+    return {"cid": cid, "url": url}
 
 
 # Analysis Endpoints (stateless heuristics + optional event creation)

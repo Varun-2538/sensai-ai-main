@@ -206,21 +206,36 @@ async def get_basic_task_details(task_id: int) -> Dict:
     if not task:
         return None
 
-    return {
+    # Build response with required columns first
+    result = {
         "id": task[0],
         "title": task[1],
         "type": task[2],
         "status": task[3],
         "org_id": task[4],
         "scheduled_publish_at": task[5],
-        "assessment_mode": task[6],
-        "duration_minutes": task[7],
-        "integrity_monitoring": task[8],
-        "attempts_allowed": task[9],
-        "shuffle_questions": task[10],
-        "show_results": task[11],
-        "passing_score_percentage": task[12],
     }
+
+    # Conditionally include extended assessment fields if present
+    if len(task) > 6:
+        # Use safe access for each optional field
+        def safe_get(idx: int, default=None):
+            try:
+                return task[idx]
+            except Exception:
+                return default
+
+        result.update({
+            "assessment_mode": safe_get(6, False),
+            "duration_minutes": safe_get(7, 60),
+            "integrity_monitoring": safe_get(8, False),
+            "attempts_allowed": safe_get(9, 1),
+            "shuffle_questions": safe_get(10, False),
+            "show_results": safe_get(11, True),
+            "passing_score_percentage": safe_get(12, 60),
+        })
+
+    return result
 
 
 async def get_task(task_id: int):

@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     slack_usage_stats_webhook_url: str | None = None
     phoenix_endpoint: str | None = None
     phoenix_api_key: str | None = None
+    pinata_jwt: str | None = None
+    pinata_gateway_base: str | None = None  # e.g., https://gateway.pinata.cloud/ipfs/
 
     model_config = SettingsConfigDict(env_file=join(root_dir, ".env"))
 

@@ -519,20 +519,7 @@ async def init_db():
                 if not await check_table_exists(code_drafts_table_name, cursor):
                     print(f"Table '{code_drafts_table_name}' not found. Creating it...")
                     await create_code_drafts_table(cursor)
-                    # Do NOT return early here; continue to check and create any newer tables
-
-                # Check for integrity monitoring tables
-                if not await check_table_exists(integrity_sessions_table_name, cursor):
-                    print(f"Table '{integrity_sessions_table_name}' not found. Creating it...")
-                    await create_integrity_sessions_table(cursor)
-
-                if not await check_table_exists(proctor_events_table_name, cursor):
-                    print(f"Table '{proctor_events_table_name}' not found. Creating it...")
-                    await create_proctor_events_table(cursor)
-
-                if not await check_table_exists(integrity_flags_table_name, cursor):
-                    print(f"Table '{integrity_flags_table_name}' not found. Creating it...")
-                    await create_integrity_flags_table(cursor)
+                # Note: additional migrations (e.g., integrity tables) are handled separately
 
             await conn.commit()
             print("Database initialization complete.")
