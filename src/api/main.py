@@ -22,6 +22,7 @@ from api.routes import (
     ai,
     scorecard,
     integrity,
+    integrity_report,
     assessment,
 )
 from api.routes.ai import (
@@ -120,6 +121,7 @@ app.include_router(code.router, prefix="/code", tags=["code"])
 app.include_router(hva.router, prefix="/hva", tags=["hva"])
 app.include_router(integrity.router, prefix="/integrity", tags=["integrity"])
 app.include_router(assessment.router, prefix="/api", tags=["assessment"])
+app.include_router(integrity_report.router, prefix="/api/integrity", tags=["integrity-report"])
 app.include_router(websocket_router, prefix="/ws", tags=["websockets"])
 
 
