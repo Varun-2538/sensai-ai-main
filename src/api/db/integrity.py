@@ -13,6 +13,8 @@ from api.config import (
     users_table_name,
     cohorts_table_name,
     tasks_table_name,
+    user_cohorts_table_name,
+    task_completions_table_name,
 )
 
 
@@ -176,6 +178,28 @@ async def update_session_status(session_uuid: str, status: str, session_end: Opt
                 (status, session_uuid)
             )
         await conn.commit()
+
+    # If we just completed the session, mark task completion (best-effort)
+    if status == 'completed':
+        async with get_new_db_connection() as conn:
+            cursor = await conn.cursor()
+            await cursor.execute(
+                f"""SELECT user_id, task_id FROM {integrity_sessions_table_name} WHERE session_uuid = ?""",
+                (session_uuid,)
+            )
+            row = await cursor.fetchone()
+            if row:
+                user_id, task_id = row[0], row[1]
+                if task_id is not None:
+                    # Insert task completion if not already present
+                    await cursor.execute(
+                        f"""
+                        INSERT OR IGNORE INTO {task_completions_table_name} (user_id, task_id)
+                        VALUES (?, ?)
+                        """,
+                        (user_id, task_id)
+                    )
+                    await conn.commit()
 
 
 async def get_active_sessions_for_user(user_id: int) -> List[Dict[str, Any]]:
@@ -549,11 +573,21 @@ async def get_cohort_integrity_overview(cohort_id: int) -> Dict[str, Any]:
     async with get_new_db_connection() as conn:
         cursor = await conn.cursor()
         
-        # Get all sessions for cohort
+        # Get all sessions associated with this cohort either directly by cohort_id
+        # or indirectly via user membership in the cohort (for sessions missing cohort_id)
         await cursor.execute(
-            f"""SELECT session_uuid FROM {integrity_sessions_table_name} 
-                WHERE cohort_id = ?""",
-            (cohort_id,)
+            f"""
+            SELECT session_uuid FROM {integrity_sessions_table_name}
+            WHERE cohort_id = ?
+            UNION
+            SELECT s.session_uuid
+            FROM {integrity_sessions_table_name} s
+            WHERE s.cohort_id IS NULL
+              AND s.user_id IN (
+                  SELECT uc.user_id FROM {user_cohorts_table_name} uc WHERE uc.cohort_id = ?
+              )
+            """,
+            (cohort_id, cohort_id)
         )
         session_rows = await cursor.fetchall()
         session_uuids = [row[0] for row in session_rows]
